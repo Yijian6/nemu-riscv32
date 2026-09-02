@@ -40,6 +40,7 @@ static int cmd_help(char *args);
 static int cmd_si(char *args);
 static int cmd_info(char *args);
 static int cmd_x(char *args);
+static int cmd_p(char *args);
 
 static struct {
 	char *name;
@@ -53,6 +54,7 @@ static struct {
 	{ "si", "Step N instructions and pause (default N=1), e.g. si 10", cmd_si },
 	{ "info", "Print program state: info r (registers) / info w (watchpoints)", cmd_info },
 	{ "x", "Scan memory: x N EXPR, e.g. x 10 0x100000", cmd_x },
+	{ "p", "Evaluate an expression, e.g. p 4 + 3 * (2 - 1)", cmd_p },
 
 };
 
@@ -145,6 +147,23 @@ static int cmd_x(char *args) {
 		printf("  0x%08x", data);
 	}
 	printf("\n");
+	return 0;
+}
+
+static int cmd_p(char *args) {
+	if (args == NULL) {
+		printf("Usage: p EXPR\n");
+		return 0;
+	}
+
+	bool success = true;
+	uint32_t val = expr(args, &success);
+	if (!success) {
+		printf("Invalid expression '%s'\n", args);
+	}
+	else {
+		printf("%u (0x%08x)\n", val, val);
+	}
 	return 0;
 }
 

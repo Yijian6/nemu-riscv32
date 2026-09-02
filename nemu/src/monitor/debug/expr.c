@@ -8,11 +8,16 @@
 #include <regex.h>
 
 enum {
-	NOTYPE = 256, EQ, NEQ, AND, OR, NUM, HEX, REG
+	NOTYPE = 256, EQ, NEQ, AND, OR, NUM, HEX, REG,
+
+	/* NEG and DEREF do not come out of the lexer: '-' and '*' are ambiguous
+	 * (binary minus vs. negation, multiply vs. dereference) and can only be
+	 * told apart once we can look at the PREVIOUS token, which is a job for
+	 * the pass in expr() below. */
+	NEG, DEREF
 
 	/* Single-character tokens ('+', '-', '*', '/', '(', ')', '!') just use
-	 * their own ASCII code as the type, so they need no enumerator here.
-	 * TODO: DEREF for pointer dereference (PA1 optional task 2). */
+	 * their own ASCII code as the type, so they need no enumerator here. */
 
 };
 
@@ -172,9 +177,10 @@ static int op_precedence(int type) {
 		case EQ: case NEQ:	return 3;
 		case '+': case '-':	return 4;
 		case '*': case '/':	return 5;	// highest
-		/* '!' is a UNARY operator: it never splits an expression into a left
-		 * and a right half, so it must never be picked as the dominant
-		 * operator. Returning -1 keeps it out of the election. */
+		/* The UNARY operators ('!', NEG, DEREF) never split an expression into
+		 * a left and a right half, so they must never be picked as the
+		 * dominant operator. Falling through to -1 keeps them out of the
+		 * election, and eval() handles them separately. */
 		default: return -1;
 	}
 }
@@ -256,16 +262,40 @@ static uint32_t eval(int p, int q, bool *success) {
 
 		if (op == -1) {
 			/* No binary operator at the top level. The only remaining legal
-			 * form is a prefix unary operator, e.g. "!1" or "!(1 == 2)".
+			 * forms are the prefix unary operators, e.g. "!1", "-1", "*$esp".
 			 * This check MUST come after find_dominant_op, not before:
 			 * "!1 + 2" is (!1) + 2 == 2, not !(1 + 2) == 0. */
-			if (tokens[p].type == '!') {
-				uint32_t val = eval(p + 1, q, success);
-				if (!*success) { return 0; }
-				return !val;
+			uint32_t val;
+
+			switch (tokens[p].type) {
+				case '!':
+					val = eval(p + 1, q, success);
+					if (!*success) { return 0; }
+					return !val;
+
+				case NEG:
+					val = eval(p + 1, q, success);
+					if (!*success) { return 0; }
+					return -val;
+
+				case DEREF:
+					val = eval(p + 1, q, success);
+					if (!*success) { return 0; }
+					/* Expressions are untyped here, so a dereference always
+					 * fetches one uint32_t. Bounds-check first: dram_read()
+					 * asserts on a bad address, which would kill all of NEMU
+					 * just because of a typo at the debugger prompt. */
+					if (val > HW_MEM_SIZE - 4) {
+						printf("cannot dereference 0x%08x: outside the simulated memory\n", val);
+						*success = false;
+						return 0;
+					}
+					return swaddr_read(val, 4);
+
+				default:
+					*success = false;
+					return 0;
 			}
-			*success = false;
-			return 0;
 		}
 
 		uint32_t val1 = eval(p, op - 1, success);
@@ -294,10 +324,33 @@ static uint32_t eval(int p, int q, bool *success) {
 	}
 }
 
+/* True if the token before position i yields a value. '-' and '*' are BINARY
+ * when they follow a value (a number, a register or a closing parenthesis)
+ * and UNARY otherwise -- including at the very start of the expression. */
+static bool follows_a_value(int i) {
+	if (i == 0) { return false; }
+
+	switch (tokens[i - 1].type) {
+		case NUM: case HEX: case REG: case ')': return true;
+		default: return false;
+	}
+}
+
 uint32_t expr(char *e, bool *success) {
 	if(!make_token(e)) {
 		*success = false;
 		return 0;
+	}
+
+	/* Retype the ambiguous '-' and '*' tokens before evaluating: the lexer
+	 * cannot tell "1 - 1" from "1 + -1", nor "2 * 3" from "*0x100000",
+	 * because that depends on context rather than on spelling. */
+	int i;
+	for (i = 0; i < nr_token; i ++) {
+		if (follows_a_value(i)) { continue; }
+
+		if (tokens[i].type == '-') { tokens[i].type = NEG; }
+		else if (tokens[i].type == '*') { tokens[i].type = DEREF; }
 	}
 
 	*success = true;

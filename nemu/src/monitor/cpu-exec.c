@@ -1,4 +1,5 @@
 #include "monitor/monitor.h"
+#include "monitor/watchpoint.h"
 #include "cpu/helper.h"
 #include <setjmp.h>
 
@@ -49,8 +50,12 @@ void cpu_exec(volatile uint32_t n) {
 	setjmp(jbuf);
 
 	for(; n > 0; n --) {
-#ifdef DEBUG
+		/* Remember where this instruction starts. cpu.eip is advanced below,
+		 * so this is the only way to still know, at watchpoint-check time,
+		 * WHICH instruction caused a watched value to change. */
 		swaddr_t eip_temp = cpu.eip;
+
+#ifdef DEBUG
 		if((n & 0xffff) == 0) {
 			/* Output some dots while executing the program. */
 			fputc('.', stderr);
@@ -72,8 +77,11 @@ void cpu_exec(volatile uint32_t n) {
 		}
 #endif
 
-		/* TODO: check watchpoints here. */
-
+		/* Check watchpoints after every instruction. If any watched expression
+		 * changed, stop so that control returns to ui_mainloop(). */
+		if(check_watchpoints(eip_temp)) {
+			nemu_state = STOP;
+		}
 
 #ifdef HAS_DEVICE
 		extern void device_update();

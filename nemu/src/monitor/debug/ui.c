@@ -41,6 +41,8 @@ static int cmd_si(char *args);
 static int cmd_info(char *args);
 static int cmd_x(char *args);
 static int cmd_p(char *args);
+static int cmd_w(char *args);
+static int cmd_d(char *args);
 
 static struct {
 	char *name;
@@ -55,6 +57,8 @@ static struct {
 	{ "info", "Print program state: info r (registers) / info w (watchpoints)", cmd_info },
 	{ "x", "Scan memory: x N EXPR, e.g. x 10 0x100000", cmd_x },
 	{ "p", "Evaluate an expression, e.g. p 4 + 3 * (2 - 1)", cmd_p },
+	{ "w", "Set a watchpoint on an expression, e.g. w $eax", cmd_w },
+	{ "d", "Delete watchpoint N, e.g. d 2", cmd_d },
 
 };
 
@@ -114,8 +118,7 @@ static int cmd_info(char *args) {
 		printf("%-4s 0x%08x\t0x%x\n", "eip", cpu.eip, cpu.eip);
 	}
 	else if (strcmp(subcmd, "w") == 0) {
-		/* TODO: print watchpoints once they are implemented (PA1 stage 3). */
-		printf("No watchpoints.\n");
+		list_watchpoints();
 	}
 	else {
 		printf("Unknown info subcommand '%s'\n", subcmd);
@@ -176,6 +179,39 @@ static int cmd_p(char *args) {
 	}
 	else {
 		printf("%u (0x%08x)\n", val, val);
+	}
+	return 0;
+}
+
+static int cmd_w(char *args) {
+	if (args == NULL) {
+		printf("Usage: w EXPR, e.g. w $eax\n");
+		return 0;
+	}
+
+	bool success = true;
+	WP *wp = set_watchpoint(args, &success);
+	if (!success) {
+		printf("Invalid expression '%s'\n", args);
+		return 0;
+	}
+
+	printf("Watchpoint %d: %s = 0x%08x\n", wp->NO, wp->expr_str, wp->old_val);
+	return 0;
+}
+
+static int cmd_d(char *args) {
+	int no;
+	if (args == NULL || sscanf(args, "%d", &no) != 1) {
+		printf("Usage: d N, e.g. d 2\n");
+		return 0;
+	}
+
+	if (delete_watchpoint(no)) {
+		printf("Deleted watchpoint %d\n", no);
+	}
+	else {
+		printf("No watchpoint number %d\n", no);
 	}
 	return 0;
 }

@@ -5,10 +5,10 @@ void ui_mainloop();
 
 int main(int argc, char *argv[]) {
 
-	/* Initialize the monitor. */
+	/* Initialize the monitor. 1️⃣初始化monitor()*/
 	init_monitor(argc, argv);
 
-	/* Test the implementation of the `CPU_state' structure. */
+	/* Test the implementation of the `CPU_state' structure. 2️⃣检测CPU状态的结构的实施(测试register寄存器结构的实现)*/
 	reg_test();
 
 	/* Initialize the virtual computer system. */

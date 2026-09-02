@@ -78,10 +78,12 @@ void restart() {
 	/* Perform some initialization to restart a program */
 #ifdef USE_RAMDISK
 	/* Read the file with name `argv[1]' into ramdisk. */
+	/*2️⃣初始化ramdisk区域，*/
 	init_ramdisk();
 #endif
 
 	/* Read the entry code into memory. */
+	/*3️⃣加载entry进入memory*/
 	load_entry();
 
 	/* Set the initial instruction pointer. */

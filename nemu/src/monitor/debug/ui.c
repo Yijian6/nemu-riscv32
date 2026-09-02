@@ -37,6 +37,9 @@ static int cmd_q(char *args) {
 }
 
 static int cmd_help(char *args);
+static int cmd_si(char *args);
+static int cmd_info(char *args);
+static int cmd_x(char *args);
 
 static struct {
 	char *name;
@@ -47,7 +50,9 @@ static struct {
 	{ "c", "Continue the execution of the program", cmd_c },
 	{ "q", "Exit NEMU", cmd_q },
 
-	/* TODO: Add more commands */
+	{ "si", "Step N instructions and pause (default N=1), e.g. si 10", cmd_si },
+	{ "info", "Print program state: info r (registers) / info w (watchpoints)", cmd_info },
+	{ "x", "Scan memory: x N EXPR, e.g. x 10 0x100000", cmd_x },
 
 };
 
@@ -73,6 +78,73 @@ static int cmd_help(char *args) {
 		}
 		printf("Unknown command '%s'\n", arg);
 	}
+	return 0;
+}
+
+static int cmd_si(char *args) {
+	int n = 1;
+	if (args != NULL) {
+		n = atoi(args);
+		if (n <= 0) {
+			printf("Usage: si [N], N must be a positive integer\n");
+			return 0;
+		}
+	}
+	cpu_exec(n);
+	return 0;
+}
+
+static int cmd_info(char *args) {
+	char *subcmd = args == NULL ? NULL : strtok(args, " ");
+
+	if (subcmd == NULL) {
+		printf("Usage: info r | info w\n");
+	}
+	else if (strcmp(subcmd, "r") == 0) {
+		printf("%-4s 0x%08x\t%d\n", "eax", cpu.eax, cpu.eax);
+		printf("%-4s 0x%08x\t%d\n", "ecx", cpu.ecx, cpu.ecx);
+		printf("%-4s 0x%08x\t%d\n", "edx", cpu.edx, cpu.edx);
+		printf("%-4s 0x%08x\t%d\n", "ebx", cpu.ebx, cpu.ebx);
+		printf("%-4s 0x%08x\t0x%x\n", "esp", cpu.esp, cpu.esp);
+		printf("%-4s 0x%08x\t0x%x\n", "ebp", cpu.ebp, cpu.ebp);
+		printf("%-4s 0x%08x\t%d\n", "esi", cpu.esi, cpu.esi);
+		printf("%-4s 0x%08x\t%d\n", "edi", cpu.edi, cpu.edi);
+		printf("%-4s 0x%08x\t0x%x\n", "eip", cpu.eip, cpu.eip);
+	}
+	else if (strcmp(subcmd, "w") == 0) {
+		/* TODO: print watchpoints once they are implemented (PA1 stage 3). */
+		printf("No watchpoints.\n");
+	}
+	else {
+		printf("Unknown info subcommand '%s'\n", subcmd);
+	}
+	return 0;
+}
+
+static int cmd_x(char *args) {
+	char *n_str = args == NULL ? NULL : strtok(args, " ");
+	char *addr_str = n_str == NULL ? NULL : strtok(NULL, " ");
+
+	if (n_str == NULL || addr_str == NULL) {
+		printf("Usage: x N EXPR (EXPR must be a hex address for now, e.g. x 10 0x100000)\n");
+		return 0;
+	}
+
+	int n = atoi(n_str);
+	/* TODO: once expr() is implemented (PA1 stage 2), replace this with
+	 * real expression evaluation instead of a bare hex number. */
+	swaddr_t addr = strtoul(addr_str, NULL, 16);
+
+	int i;
+	for (i = 0; i < n; i ++) {
+		if (i % 4 == 0) {
+			if (i != 0) { printf("\n"); }
+			printf("0x%08x:", addr + i * 4);
+		}
+		uint32_t data = swaddr_read(addr + i * 4, 4);
+		printf("  0x%08x", data);
+	}
+	printf("\n");
 	return 0;
 }
 

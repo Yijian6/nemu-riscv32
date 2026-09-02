@@ -124,18 +124,31 @@ static int cmd_info(char *args) {
 }
 
 static int cmd_x(char *args) {
-	char *n_str = args == NULL ? NULL : strtok(args, " ");
-	char *addr_str = n_str == NULL ? NULL : strtok(NULL, " ");
+	if (args == NULL) {
+		printf("Usage: x N EXPR, e.g. x 10 0x100000 or x 10 $esp\n");
+		return 0;
+	}
 
-	if (n_str == NULL || addr_str == NULL) {
-		printf("Usage: x N EXPR (EXPR must be a hex address for now, e.g. x 10 0x100000)\n");
+	/* Split off the first token as N; everything after it is the expression,
+	 * which may itself contain spaces (e.g. "x 10 $esp + 4"). This mirrors
+	 * how ui_mainloop() splits the command from its arguments. */
+	char *args_end = args + strlen(args);
+	char *n_str = strtok(args, " ");
+	char *expr_str = n_str == NULL ? NULL : n_str + strlen(n_str) + 1;
+
+	if (n_str == NULL || expr_str == NULL || expr_str >= args_end) {
+		printf("Usage: x N EXPR, e.g. x 10 0x100000 or x 10 $esp\n");
 		return 0;
 	}
 
 	int n = atoi(n_str);
-	/* TODO: once expr() is implemented (PA1 stage 2), replace this with
-	 * real expression evaluation instead of a bare hex number. */
-	swaddr_t addr = strtoul(addr_str, NULL, 16);
+
+	bool success = true;
+	swaddr_t addr = expr(expr_str, &success);
+	if (!success) {
+		printf("Invalid expression '%s'\n", expr_str);
+		return 0;
+	}
 
 	int i;
 	for (i = 0; i < n; i ++) {

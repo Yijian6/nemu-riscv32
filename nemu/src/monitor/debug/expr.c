@@ -8,10 +8,11 @@
 #include <regex.h>
 
 enum {
-	NOTYPE = 256, EQ, NUM
+	NOTYPE = 256, EQ, NEQ, AND, OR, NUM, HEX, REG
 
-	/* TODO: Add more token types (PA1 stage 2 task 5: hex numbers, register
-	 * names, !=, &&, ||, !, pointer dereference) */
+	/* Single-character tokens ('+', '-', '*', '/', '(', ')', '!') just use
+	 * their own ASCII code as the type, so they need no enumerator here.
+	 * TODO: DEREF for pointer dereference (PA1 optional task 2). */
 
 };
 
@@ -20,19 +21,28 @@ static struct rule {
 	int token_type;
 } rules[] = {
 
-	/* TODO: Add more rules.
-	 * Pay attention to the precedence level of different rules.
+	/* NOTE: rules are tried IN ORDER and the first one that matches at the
+	 * current position wins -- this is NOT longest-match. So a longer token
+	 * must be listed before any shorter token it starts with:
+	 *   "0x.." before "[0-9]+"  (else "0x10" is cut into "0" and "x10")
+	 *   "!="   before "!"       (else "!=" is cut into "!" and "=")
 	 */
 
-	{" +",		NOTYPE},			// spaces
-	{"\\+",		'+'},				// plus
-	{"-",		'-'},				// minus
-	{"\\*",		'*'},				// multiply
-	{"/",		'/'},				// divide
-	{"\\(",		'('},				// left parenthesis
-	{"\\)",		')'},				// right parenthesis
-	{"[0-9]+",	NUM},				// decimal number
-	{"==", EQ}						// equal
+	{" +",					NOTYPE},	// spaces
+	{"0[xX][0-9a-fA-F]+",	HEX},		// hexadecimal number (before decimal!)
+	{"[0-9]+",				NUM},		// decimal number
+	{"\\$[a-zA-Z]+",			REG},		// register name, e.g. $eax ('$' is a metachar)
+	{"\\+",					'+'},		// plus
+	{"-",					'-'},		// minus
+	{"\\*",					'*'},		// multiply
+	{"/",					'/'},		// divide
+	{"\\(",					'('},		// left parenthesis
+	{"\\)",					')'},		// right parenthesis
+	{"==",					EQ},		// equal
+	{"!=",					NEQ},		// not equal (before "!"!)
+	{"&&",					AND},		// logical and
+	{"\\|\\|",				OR},		// logical or ('|' is a metachar)
+	{"!",					'!'}		// logical not
 };
 
 #define NR_REGEX (sizeof(rules) / sizeof(rules[0]) )
@@ -157,8 +167,14 @@ static bool check_parentheses(int p, int q) {
  * Returns -1 for tokens that aren't an operator we split on here. */
 static int op_precedence(int type) {
 	switch (type) {
-		case '+': case '-': return 1;
-		case '*': case '/': return 2;
+		case OR:			return 1;	// lowest
+		case AND:			return 2;
+		case EQ: case NEQ:	return 3;
+		case '+': case '-':	return 4;
+		case '*': case '/':	return 5;	// highest
+		/* '!' is a UNARY operator: it never splits an expression into a left
+		 * and a right half, so it must never be picked as the dominant
+		 * operator. Returning -1 keeps it out of the election. */
 		default: return -1;
 	}
 }
@@ -190,6 +206,29 @@ static int find_dominant_op(int p, int q) {
 	return op;
 }
 
+/* Look up the value of a register token such as "$eax" / "$ax" / "$al" /
+ * "$eip". The three name tables (regsl/regsw/regsb) and the reg_l/reg_w/reg_b
+ * access macros all live in cpu/reg.h. */
+static uint32_t get_reg_value(const char *token_str, bool *success) {
+	const char *name = token_str + 1;	/* skip the leading '$' */
+	int i;
+
+	if (strcmp(name, "eip") == 0) { return cpu.eip; }
+
+	for (i = R_EAX; i <= R_EDI; i ++) {
+		if (strcmp(name, regsl[i]) == 0) { return reg_l(i); }
+	}
+	for (i = R_AX; i <= R_DI; i ++) {
+		if (strcmp(name, regsw[i]) == 0) { return reg_w(i); }
+	}
+	for (i = R_AL; i <= R_BH; i ++) {
+		if (strcmp(name, regsb[i]) == 0) { return reg_b(i); }
+	}
+
+	*success = false;
+	return 0;
+}
+
 static uint32_t eval(int p, int q, bool *success) {
 	if (p > q) {
 		/* Bad expression, e.g. empty parentheses "()" recursing inward. */
@@ -197,13 +236,16 @@ static uint32_t eval(int p, int q, bool *success) {
 		return 0;
 	}
 	else if (p == q) {
-		/* Single token: for now (PA1 task 3/4) this must be a number.
-		 * Register names / hex numbers are added in task 5. */
-		if (tokens[p].type != NUM) {
-			*success = false;
-			return 0;
+		/* Single token: the base case of the recursion. It must be something
+		 * that carries a value on its own -- a number or a register. */
+		switch (tokens[p].type) {
+			case NUM: return strtoul(tokens[p].str, NULL, 10);
+			case HEX: return strtoul(tokens[p].str, NULL, 16);
+			case REG: return get_reg_value(tokens[p].str, success);
+			default:
+				*success = false;
+				return 0;
 		}
-		return strtoul(tokens[p].str, NULL, 10);
 	}
 	else if (check_parentheses(p, q)) {
 		/* Surrounded by one matching pair of parentheses: strip them. */
@@ -211,7 +253,17 @@ static uint32_t eval(int p, int q, bool *success) {
 	}
 	else {
 		int op = find_dominant_op(p, q);
+
 		if (op == -1) {
+			/* No binary operator at the top level. The only remaining legal
+			 * form is a prefix unary operator, e.g. "!1" or "!(1 == 2)".
+			 * This check MUST come after find_dominant_op, not before:
+			 * "!1 + 2" is (!1) + 2 == 2, not !(1 + 2) == 0. */
+			if (tokens[p].type == '!') {
+				uint32_t val = eval(p + 1, q, success);
+				if (!*success) { return 0; }
+				return !val;
+			}
 			*success = false;
 			return 0;
 		}
@@ -231,6 +283,10 @@ static uint32_t eval(int p, int q, bool *success) {
 					return 0;
 				}
 				return val1 / val2;
+			case EQ:  return val1 == val2;
+			case NEQ: return val1 != val2;
+			case AND: return val1 && val2;
+			case OR:  return val1 || val2;
 			default:
 				*success = false;
 				return 0;

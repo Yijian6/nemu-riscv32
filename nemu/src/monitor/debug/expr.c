@@ -7,8 +7,11 @@
 #include <sys/types.h>
 #include <regex.h>
 
+/* 在 elf.c 里实现：按名字到符号表中查一个变量的地址 */
+bool lookup_symbol_addr(const char *name, uint32_t *addr);
+
 enum {
-	NOTYPE = 256, EQ, NEQ, AND, OR, NUM, HEX, REG,
+	NOTYPE = 256, EQ, NEQ, AND, OR, NUM, HEX, REG, SYMB,
 
 	/* NEG and DEREF do not come out of the lexer: '-' and '*' are ambiguous
 	 * (binary minus vs. negation, multiply vs. dereference) and can only be
@@ -37,6 +40,7 @@ static struct rule {
 	{"0[xX][0-9a-fA-F]+",	HEX},		// hexadecimal number (before decimal!)
 	{"[0-9]+",				NUM},		// decimal number
 	{"\\$[a-zA-Z]+",			REG},		// register name, e.g. $eax ('$' is a metachar)
+	{"[a-zA-Z_][a-zA-Z0-9_]*",	SYMB},		// variable name, e.g. test_data (C identifier)
 	{"\\+",					'+'},		// plus
 	{"-",					'-'},		// minus
 	{"\\*",					'*'},		// multiply
@@ -248,6 +252,16 @@ static uint32_t eval(int p, int q, bool *success) {
 			case NUM: return strtoul(tokens[p].str, NULL, 10);
 			case HEX: return strtoul(tokens[p].str, NULL, 16);
 			case REG: return get_reg_value(tokens[p].str, success);
+			case SYMB: {
+				/* 变量名一律返回它的地址，不是它的值：表达式求值里没有类型
+				 * 系统，分不出"整型变量"和"数组"，所以统一给地址，要取值就
+				 * 自己写 p *x（这一点和 GDB 不同，手册里专门说明过）。 */
+				uint32_t addr;
+				if (lookup_symbol_addr(tokens[p].str, &addr)) { return addr; }
+				printf("Unknown variable '%s'\n", tokens[p].str);
+				*success = false;
+				return 0;
+			}
 			default:
 				*success = false;
 				return 0;
@@ -331,7 +345,7 @@ static bool follows_a_value(int i) {
 	if (i == 0) { return false; }
 
 	switch (tokens[i - 1].type) {
-		case NUM: case HEX: case REG: case ')': return true;
+		case NUM: case HEX: case REG: case SYMB: case ')': return true;
 		default: return false;
 	}
 }

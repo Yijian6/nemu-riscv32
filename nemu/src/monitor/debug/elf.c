@@ -81,3 +81,26 @@ void load_elf_tables(int argc, char *argv[]) {
 	fclose(fp);
 }
 
+/* 在符号表里按名字找一个变量，找到就把它的地址写进 *addr 并返回 true。
+ *
+ * 符号表(symtab)的每一项 Elf32_Sym 里：
+ *   st_name  是这个名字在字符串表(strtab)里的偏移量——字符串表就是把所有
+ *            标识符首尾相接拼成的一大串，所以 strtab + st_name 就是名字本身；
+ *   st_info  的低 4 位是符号的类型，用 ELF32_ST_TYPE 取出来，
+ *            STT_OBJECT(变量) / STT_FUNC(函数) 是我们关心的两种；
+ *   st_value 是这个符号在运行时刻的地址。
+ *
+ * 只认 STT_OBJECT，是因为表达式里写变量名要的是变量地址；函数名属于
+ * STT_FUNC，是选做任务1(bt 打印栈帧链)才需要的。 */
+bool lookup_symbol_addr(const char *name, uint32_t *addr) {
+	int i;
+	for(i = 0; i < nr_symtab_entry; i ++) {
+		if(ELF32_ST_TYPE(symtab[i].st_info) == STT_OBJECT &&
+				strcmp(strtab + symtab[i].st_name, name) == 0) {
+			*addr = symtab[i].st_value;
+			return true;
+		}
+	}
+	return false;
+}
+

@@ -1,6 +1,7 @@
 #include "monitor/monitor.h"
 #include "monitor/expr.h"
 #include "monitor/watchpoint.h"
+#include "memory/cache.h"
 #include "nemu.h"
 
 #include <stdlib.h>
@@ -54,7 +55,7 @@ static struct {
 	{ "q", "Exit NEMU", cmd_q },
 
 	{ "si", "Step N instructions and pause (default N=1), e.g. si 10", cmd_si },
-	{ "info", "Print program state: info r (registers) / info w (watchpoints)", cmd_info },
+	{ "info", "Print program state: info r (registers) / info w (watchpoints) / info c (cache stats)", cmd_info },
 	{ "x", "Scan memory: x N EXPR, e.g. x 10 0x100000", cmd_x },
 	{ "p", "Evaluate an expression, e.g. p 4 + 3 * (2 - 1)", cmd_p },
 	{ "w", "Set a watchpoint on an expression, e.g. w $eax", cmd_w },
@@ -104,7 +105,7 @@ static int cmd_info(char *args) {
 	char *subcmd = args == NULL ? NULL : strtok(args, " ");
 
 	if (subcmd == NULL) {
-		printf("Usage: info r | info w\n");
+		printf("Usage: info r | info w | info c\n");
 	}
 	else if (strcmp(subcmd, "r") == 0) {
 		printf("%-4s 0x%08x\t%d\n", "eax", cpu.eax, cpu.eax);
@@ -122,6 +123,15 @@ static int cmd_info(char *args) {
 	}
 	else if (strcmp(subcmd, "w") == 0) {
 		list_watchpoints();
+	}
+	else if (strcmp(subcmd, "c") == 0) {
+		/* 模拟访存代价：命中 2 周期、缺失 200 周期，用来观察 cache 的效果 */
+		uint64_t total = cache_hit_cnt + cache_miss_cnt;
+		printf("%-12s %llu\n", "hit", (unsigned long long)cache_hit_cnt);
+		printf("%-12s %llu\n", "miss", (unsigned long long)cache_miss_cnt);
+		printf("%-12s %.4f%%\n", "hit rate",
+				total == 0 ? 0.0 : 100.0 * cache_hit_cnt / total);
+		printf("%-12s %llu\n", "cycles", (unsigned long long)cache_cycle);
 	}
 	else {
 		printf("Unknown info subcommand '%s'\n", subcmd);

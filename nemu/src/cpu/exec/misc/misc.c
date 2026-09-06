@@ -6,6 +6,18 @@ make_helper(nop) {
 	return 1;
 }
 
+make_helper(leave) {
+	/* LEAVE = "mov %ebp,%esp; pop %ebp" 两步的合体：先把 esp 收回到当前
+	 * 栈帧开始的地方(丢弃这次调用里局部变量占的空间)，再弹出调用者的
+	 * ebp（对称于 call 之后 push %ebp; mov %esp,%ebp 建立的那个栈帧）。 */
+	cpu.esp = cpu.ebp;
+	cpu.ebp = swaddr_read(cpu.esp, 4);
+	cpu.esp += 4;
+
+	print_asm("leave");
+	return 1;
+}
+
 make_helper(int3) {
 	void do_int3();
 	do_int3();

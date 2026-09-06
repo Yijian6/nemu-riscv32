@@ -26,13 +26,14 @@ make_helper(concat(decode_i_, SUFFIX)) {
 make_helper(concat(decode_si_, SUFFIX)) {
 	op_src->type = OP_TYPE_IMM;
 
-	/* TODO: Use instr_fetch() to read `DATA_BYTE' bytes of memory pointed
-	 * by `eip'. Interpret the result as an signed immediate, and assign
-	 * it to op_src->simm.
-	 *
-	op_src->simm = ???
-	 */
-	panic("please implement me");
+	/* Read DATA_BYTE bytes and interpret them as a SIGNED immediate.
+	 * instr_fetch() returns a uint32_t, so a byte 0xfe would come back as
+	 * 0x000000fe (254) instead of -2. Casting through DATA_TYPE_S (int8_t /
+	 * int32_t, chosen by template-start.h according to DATA_BYTE) reinterprets
+	 * those bytes as a signed value of the right width, and the assignment to
+	 * the int32_t field then sign-extends it: 0xfe -> -2 -> 0xfffffffe.
+	 * This matters because jmp/call/jcc offsets can be negative (jump back). */
+	op_src->simm = (DATA_TYPE_S)instr_fetch(eip, DATA_BYTE);
 
 	op_src->val = op_src->simm;
 

@@ -1,16 +1,16 @@
 #include "common.h"
-
-uint32_t dram_read(hwaddr_t, size_t);
-void dram_write(hwaddr_t, size_t, uint32_t);
+#include "memory/cache.h"
 
 /* Memory accessing interfaces */
 
+/* 物理地址的读写现在先经过 cache，只有 cache 缺失时才会真正碰到 DRAM
+ * （这一步在 cache.c 内部完成）。 */
 uint32_t hwaddr_read(hwaddr_t addr, size_t len) {
-	return dram_read(addr, len) & (~0u >> ((4 - len) << 3));
+	return cache_read(addr, len) & (~0u >> ((4 - len) << 3));
 }
 
 void hwaddr_write(hwaddr_t addr, size_t len, uint32_t data) {
-	dram_write(addr, len, data);
+	cache_write(addr, len, data);
 }
 
 uint32_t lnaddr_read(lnaddr_t addr, size_t len) {

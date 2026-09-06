@@ -19,7 +19,7 @@ void dram_write(hwaddr_t, size_t, uint32_t);
  * 块内偏移决定"在这一块的第几个字节"，组号决定"该去哪一组找"，
  * tag 用来确认"这一块装的到底是不是我要的那块内存"。 */
 #define CACHE_BLOCK_WIDTH 6
-#define CACHE_SIZE_WIDTH 16
+#define CACHE_SIZE_WIDTH 10
 #define CACHE_WAY_WIDTH 3
 
 #define CACHE_SET_WIDTH (CACHE_SIZE_WIDTH - CACHE_BLOCK_WIDTH - CACHE_WAY_WIDTH)

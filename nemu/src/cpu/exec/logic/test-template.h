@@ -11,6 +11,8 @@ static void do_execute () {
 	print_asm_template2();
 }
 
-make_instr_helper(r2rm)
+make_instr_helper(i2a)     /* TEST AL/eAX, imm : 0xa8 / 0xa9 */
+make_instr_helper(i2rm)    /* TEST r/m, imm    : 0xf6 /0 / 0xf7 /0 */
+make_instr_helper(r2rm)    /* TEST r/m, r      : 0x84 / 0x85 */
 
 #include "cpu/exec/template-end.h"

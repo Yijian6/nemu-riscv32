@@ -9,4 +9,7 @@ void update_eflags_pf_zf_sf(uint32_t);
  * 例如 0x4 = E/Z(相等), 0xc = L/NGE(有符号小于)。返回条件是否成立。 */
 int check_cc(uint8_t cc);
 
+/* 条件码对应的助记符后缀("e"/"ne"/"l"/"ge"...)，只给反汇编打印用 */
+extern const char *cc_name[16];
+
 #endif

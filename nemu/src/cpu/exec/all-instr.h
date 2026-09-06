@@ -27,6 +27,8 @@
 
 #include "logic/and.h"
 #include "logic/test.h"
+#include "logic/setcc.h"
+#include "logic/shld.h"
 #include "logic/or.h"
 #include "logic/not.h"
 #include "logic/xor.h"
@@ -36,6 +38,7 @@
 #include "logic/shrd.h"
 
 #include "string/rep.h"
+#include "string/lods.h"
 #include "string/scas.h"
 #include "string/stos.h"
 #include "string/movs.h"

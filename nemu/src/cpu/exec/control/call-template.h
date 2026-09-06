@@ -22,4 +22,23 @@ static void do_execute() {
 
 make_instr_helper(si)
 
+#if DATA_BYTE == 4
+/* CALL r/m32 (0xff /2)：间接调用，跳转目标是操作数里存的一个绝对地址
+ * （典型来源是函数指针，比如 integral.c 里的 fun(a) 调用）。
+ * 因为是绝对地址而不是相对偏移量，不能用上面那套"事后再加长度"的加法技巧，
+ * 要像 jmp_rm_l 那样先减掉本条指令的长度，让 cpu_exec() 的加法刚好抵消。 */
+make_helper(call_rm_l) {
+	int len = decode_rm_l(eip + 1);
+	swaddr_t ret_addr = cpu.eip + 1 + len;
+
+	cpu.esp -= 4;
+	swaddr_write(cpu.esp, 4, ret_addr);
+
+	cpu.eip = op_src->val - (len + 1);
+
+	print_asm("call *%s", op_src->str);
+	return len + 1;
+}
+#endif
+
 #include "cpu/exec/template-end.h"

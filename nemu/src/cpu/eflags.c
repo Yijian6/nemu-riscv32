@@ -15,6 +15,11 @@ void update_eflags_pf_zf_sf(uint32_t result) {
 	cpu.eflags.SF = result >> 31;
 }
 
+const char *cc_name[16] = {
+	"o", "no", "b", "ae", "e", "ne", "be", "a",
+	"s", "ns", "p", "np", "l", "ge", "le", "g"
+};
+
 /* i386 手册第20章 jcc 表：16 种条件码(tttn)，jcc/setcc 共用同一套判断，
  * 只是"跳不跳"和"写不写1个字节"的区别。 */
 int check_cc(uint8_t cc) {

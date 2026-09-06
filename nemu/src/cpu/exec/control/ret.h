@@ -1,7 +1,7 @@
 #ifndef __RET_H__
 #define __RET_H__
 
-/* RET (近返回，无操作数)：mov-c 唯一用到的返回形式 */
-make_helper(ret);
+make_helper(ret);     /* RET       0xc2 之外的无操作数形式 0xc3 */
+make_helper(ret_i);   /* RET imm16 0xc2：返回并弹掉 imm16 字节的实参 */
 
 #endif

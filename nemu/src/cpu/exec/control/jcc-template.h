@@ -2,16 +2,6 @@
 
 #define instr jcc
 
-/* 这份模板会在 jcc.c 里按 DATA_BYTE=1/4 各展开一次，cc_name 只需要一份，
- * 用宏挡住第二次展开。 */
-#ifndef CC_NAME_DEFINED
-#define CC_NAME_DEFINED
-static const char *cc_name[16] = {
-	"o", "no", "b", "ae", "e", "ne", "be", "a",
-	"s", "ns", "p", "np", "l", "ge", "le", "g"
-};
-#endif
-
 /* jcc 是 16 条指令(0x70-0x7f 短跳, 0x0f80-0x0f8f 近跳)共用一套逻辑，
  * 区别只在"低4位选哪个条件码"——这个信息 opcode 字节里已经有了
  * (ops_decoded.opcode，_2byte_esc 会把它设成 0x100|第二字节)，

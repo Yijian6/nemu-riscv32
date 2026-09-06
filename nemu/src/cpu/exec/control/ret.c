@@ -11,3 +11,17 @@ make_helper(ret) {
 	print_asm("ret");
 	return 1;
 }
+
+/* RET imm16 (0xc2)：返回之后再把 imm16 个字节的实参从栈上丢掉。
+ * 用在被调用方负责清理参数的调用约定上（gcc 对返回结构体的函数会这么干，
+ * struct 这个测试用例里的 ret $0x4 就是）。指令共 3 字节：操作码 + 2字节立即数。 */
+make_helper(ret_i) {
+	uint16_t imm = instr_fetch(eip + 1, 2);
+
+	swaddr_t ret_addr = swaddr_read(cpu.esp, 4);
+	cpu.esp += 4 + imm;
+	cpu.eip = ret_addr - 3;
+
+	print_asm("ret $0x%x", imm);
+	return 3;
+}

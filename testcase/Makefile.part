@@ -6,7 +6,10 @@ $(eval $(call make_common_rules,testcase,$(testcase_CFLAGS_EXTRA)))
 # redefine testcase_BIN
 testcase_BIN := $(testcase_COBJS:.o=)
 testcase_START_OBJ := $(testcase_OBJ_DIR)/start.o
-testcase_LDFLAGS := -m elf_i386 -T testcase/user.ld
+# 引入 kernel 之后，用户程序不再自己从 _start 跑起来，而是由 kernel 的 loader
+# 加载到 0x800000 附近(避开 0x100000 处的 kernel)，再跳到它的入口。入口设成
+# main，这样 main 返回时就回到 kernel，由 kernel 发出 HIT_GOOD_TRAP。
+testcase_LDFLAGS := -m elf_i386 -e main -Ttext-segment=0x00800000
 
 $(testcase_BIN): % : $(testcase_START_OBJ) %.o $(FLOAT) $(LIBC)
 	$(call make_command, $(LD), $(testcase_LDFLAGS), ld $@, $^)

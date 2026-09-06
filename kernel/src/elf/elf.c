@@ -30,26 +30,38 @@ uint32_t loader() {
 
 	elf = (void*)buf;
 
-	/* TODO: fix the magic number with the correct one */
-	const uint32_t elf_magic = 0xBadC0de;
+	/* ELF 文件开头的 4 个"魔数"字节是 0x7f 'E' 'L' 'F'，即 7f 45 4c 46。
+	 * x86 是小端序，把这 4 个字节当成一个 32 位整数读出来时字节序要反过来，
+	 * 所以比较的常量是 0x464c457f。（这也回答了思考题5：操作系统就是靠
+	 * 文件开头这几个字节来判断"格式错误"的。） */
+	const uint32_t elf_magic = 0x464c457f;
 	uint32_t *p_magic = (void *)buf;
 	nemu_assert(*p_magic == elf_magic);
 
 	/* Load each program segment */
-	panic("please implement me");
-	for(; true; ) {
+
+	/* program header table(程序头表)描述了"面向执行"的视角：每一个表项
+	 * 描述一个 segment(段)。表从文件偏移 e_phoff 处开始，共 e_phnum 项，
+	 * 每项 e_phentsize 字节。 */
+	int i;
+	for(i = 0; i < elf->e_phnum; i ++) {
+		ph = (Elf32_Phdr *)(buf + elf->e_phoff + i * elf->e_phentsize);
+
 		/* Scan the program header table, load each segment into memory */
 		if(ph->p_type == PT_LOAD) {
 
-			/* TODO: read the content of the segment from the ELF file 
-			 * to the memory region [VirtAddr, VirtAddr + FileSiz)
-			 */
-			 
-			 
-			/* TODO: zero the memory region 
-			 * [VirtAddr + FileSiz, VirtAddr + MemSiz)
-			 */
+			/* 把 segment 的内容从 ELF 文件(在 ramdisk 里)搬到内存
+			 * [VirtAddr, VirtAddr + FileSiz)。现在还没有虚拟内存，
+			 * VirtAddr 直接当物理地址用。 */
+			ramdisk_read((uint8_t *)ph->p_vaddr, ph->p_offset, ph->p_filesz);
 
+			/* 把 [VirtAddr + FileSiz, VirtAddr + MemSiz) 清零。
+			 * 这段差额就是思考题6 的答案：像未初始化全局变量(.bss)这类数据，
+			 * 内容全是 0，没必要在文件里存一大片 0 白白占空间，只要记下
+			 * "在内存里要占 MemSiz 这么大"，加载时补零即可。所以 FileSiz
+			 * 永远不会大于 MemSiz。 */
+			memset((void *)(ph->p_vaddr + ph->p_filesz), 0,
+					ph->p_memsz - ph->p_filesz);
 
 #ifdef IA32_PAGE
 			/* Record the program break for future use. */

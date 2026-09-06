@@ -54,7 +54,9 @@ clean: clean-cpp
 ##### some convinient rules #####
 
 USERPROG := obj/testcase/mov-c
-ENTRY := $(USERPROG)
+# 引入 loader 之后，NEMU 加载到 0x100000 并最先执行的不再是用户程序本身，
+# 而是 kernel；用户程序由 kernel 的 loader 从 ramdisk(即 USERPROG)里加载。
+ENTRY := $(kernel_BIN)
 
 entry: $(ENTRY)
 	objcopy -S -O binary $(ENTRY) entry

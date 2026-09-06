@@ -116,6 +116,9 @@ static int cmd_info(char *args) {
 		printf("%-4s 0x%08x\t%d\n", "esi", cpu.esi, cpu.esi);
 		printf("%-4s 0x%08x\t%d\n", "edi", cpu.edi, cpu.edi);
 		printf("%-4s 0x%08x\t0x%x\n", "eip", cpu.eip, cpu.eip);
+		printf("%-4s 0x%08x\tCF=%d PF=%d ZF=%d SF=%d IF=%d DF=%d OF=%d\n", "eflags",
+				cpu.eflags.val, cpu.eflags.CF, cpu.eflags.PF, cpu.eflags.ZF,
+				cpu.eflags.SF, cpu.eflags.IF, cpu.eflags.DF, cpu.eflags.OF);
 	}
 	else if (strcmp(subcmd, "w") == 0) {
 		list_watchpoints();

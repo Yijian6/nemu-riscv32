@@ -89,6 +89,11 @@ void restart() {
 	/* Set the initial instruction pointer. */
 	cpu.eip = ENTRY_START;
 
+	/* Set the initial EFLAGS. Per the i386 manual ch.10 (processor state
+	 * after RESET), EFLAGS = 0x00000002: all real flags start at 0, and
+	 * bit 1 is a reserved bit that is hardwired to 1. */
+	cpu.eflags.val = 0x00000002;
+
 	/* Initialize DRAM. */
 	init_ddr3();
 }

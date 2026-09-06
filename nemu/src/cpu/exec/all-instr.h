@@ -15,10 +15,14 @@
 #include "arith/div.h"
 #include "arith/sbb.h"
 #include "arith/sub.h"
+#include "arith/cmp.h"
 
 #include "control/call.h"
 #include "control/push.h"
+#include "control/pop.h"
+#include "control/ret.h"
 #include "control/jmp.h"
+#include "control/je.h"
 
 #include "logic/and.h"
 #include "logic/test.h"
